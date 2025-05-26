@@ -22,7 +22,9 @@ import ru.yandex.buggyweatherapp.viewmodel.WeatherViewModel
 
 @Composable
 fun WeatherScreen(
-    viewModel: WeatherViewModel = hiltViewModel(), modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: WeatherViewModel = hiltViewModel()
+
 ) {
 
     DisposableEffect(Unit) {

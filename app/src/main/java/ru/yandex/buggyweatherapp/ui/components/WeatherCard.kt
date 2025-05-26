@@ -1,6 +1,5 @@
 package ru.yandex.buggyweatherapp.ui.components
 
-import android.widget.ImageView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,18 +20,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import ru.yandex.buggyweatherapp.R
 import ru.yandex.buggyweatherapp.model.WeatherData
-import ru.yandex.buggyweatherapp.utils.ImageLoader
 import ru.yandex.buggyweatherapp.utils.WeatherIconMapper
 
 @Composable
@@ -59,9 +53,7 @@ fun DetailedWeatherCard(
 
 @Composable
 private fun HeaderSection(
-    weather: WeatherData,
-    onFavoriteClick: () -> Unit,
-    onRefreshClick: () -> Unit
+    weather: WeatherData, onFavoriteClick: () -> Unit, onRefreshClick: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -91,9 +83,7 @@ private fun HeaderSection(
 
 @Composable
 private fun ActionsRow(
-    onFavoriteClick: () -> Unit,
-    onRefreshClick: () -> Unit,
-    isFavorite: Boolean
+    onFavoriteClick: () -> Unit, onRefreshClick: () -> Unit, isFavorite: Boolean
 ) {
     Row {
         IconButton(onClick = onFavoriteClick) {
@@ -116,8 +106,7 @@ private fun ActionsRow(
 @Composable
 private fun TemperatureSection(weather: WeatherData) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(vertical = 8.dp)
+        verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)
     ) {
 
         AsyncImage(
@@ -141,7 +130,7 @@ private fun TemperatureSection(weather: WeatherData) {
 }
 
 @Composable
-private fun WeatherDataDetails(weather: WeatherData){
+private fun WeatherDataDetails(weather: WeatherData) {
     Spacer(modifier = Modifier.height(16.dp))
 
     LazyColumn {
