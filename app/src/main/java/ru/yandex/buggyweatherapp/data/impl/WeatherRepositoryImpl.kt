@@ -82,13 +82,4 @@ class WeatherRepositoryImpl: WeatherRepository {
                 json.getAsJsonObject("snow").get("1h").asDouble else null
         )
     }
-
-    private fun extractLocationFromResponse(json: JsonObject): Location {
-        val coord = json.getAsJsonObject("coord")
-        val lat = coord.get("lat").asDouble
-        val lon = coord.get("lon").asDouble
-        val name = json.get("name").asString
-
-        return Location(lat, lon, name)
-    }
 }
