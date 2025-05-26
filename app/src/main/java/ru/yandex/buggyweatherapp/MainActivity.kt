@@ -7,7 +7,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -16,14 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
+import dagger.hilt.android.AndroidEntryPoint
 import ru.yandex.buggyweatherapp.ui.screens.WeatherScreen
 import ru.yandex.buggyweatherapp.ui.theme.BuggyWeatherAppTheme
-import ru.yandex.buggyweatherapp.viewmodel.WeatherViewModel
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    
-    private val weatherViewModel = WeatherViewModel()
-    
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -68,7 +65,6 @@ class MainActivity : ComponentActivity() {
             BuggyWeatherAppTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     WeatherScreen(
-                        viewModel = weatherViewModel,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -76,10 +72,8 @@ class MainActivity : ComponentActivity() {
         }
     }
     
-    
     override fun onDestroy() {
         super.onDestroy()
-        
     }
 }
 
@@ -87,7 +81,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun WeatherAppPreview() {
     BuggyWeatherAppTheme {
-        
         Text("Weather App Preview")
     }
 }

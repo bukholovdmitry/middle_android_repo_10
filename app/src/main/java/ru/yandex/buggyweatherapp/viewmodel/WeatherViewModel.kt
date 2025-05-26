@@ -1,157 +1,123 @@
 package ru.yandex.buggyweatherapp.viewmodel
 
-import android.content.Context
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import ru.yandex.buggyweatherapp.WeatherApplication
 import ru.yandex.buggyweatherapp.model.Location
-import ru.yandex.buggyweatherapp.model.WeatherData
-import ru.yandex.buggyweatherapp.repository.LocationRepository
-import ru.yandex.buggyweatherapp.repository.WeatherRepository
-import ru.yandex.buggyweatherapp.utils.ImageLoader
-import java.util.Timer
-import java.util.TimerTask
+import ru.yandex.buggyweatherapp.model.ScreenState
+import ru.yandex.buggyweatherapp.data.repository.LocationRepository
+import ru.yandex.buggyweatherapp.data.repository.WeatherRepository
+import javax.inject.Inject
 
-class WeatherViewModel : ViewModel() {
-    
-    
-    private lateinit var activityContext: Context
-    
-    
-    private val weatherRepository = WeatherRepository()
-    private val locationRepository by lazy { 
-        LocationRepository(activityContext)
+@HiltViewModel
+class WeatherViewModel @Inject constructor(
+    private val locationRepository: LocationRepository,
+    private val weatherRepository: WeatherRepository
+) : ViewModel() {
+    private val _uiState = MutableStateFlow<ScreenState>(ScreenState.Default)
+    val uiState: StateFlow<ScreenState> = _uiState.asStateFlow()
+
+    private val currentLocation = MutableLiveData<Location>()
+
+    private var refreshJob: Job? = null
+
+    companion object {
+        const val AUTO_REFRESH_DELAY = 10000L
     }
-    
-    
-    val weatherData = MutableLiveData<WeatherData>()
-    val currentLocation = MutableLiveData<Location>()
-    val isLoading = MutableLiveData<Boolean>()
-    val error = MutableLiveData<String>()
-    val cityName = MutableLiveData<String>()
-    
-    
-    private val coroutineScope = CoroutineScope(Dispatchers.Main + Job())
-    
-    
-    private var refreshTimer: Timer? = null
-    
-    
-    fun initialize(context: Context) {
-        this.activityContext = context
+
+    fun initialize() {
         fetchCurrentLocationWeather()
-        
-        
         startAutoRefresh()
     }
-    
-    
+
     fun fetchCurrentLocationWeather() {
-        isLoading.value = true
-        error.value = null
-        
-        locationRepository.getCurrentLocation { location ->
+        viewModelScope.launch {
+            val location = locationRepository.getCurrentLocation()
+
             if (location != null) {
                 currentLocation.value = location
-                
-                
-                val cityNameFromLocation = locationRepository.getCityNameFromLocation(location)
-                cityName.value = cityNameFromLocation
-                
                 getWeatherForLocation(location)
             } else {
-                isLoading.value = false
-                error.value = "Unable to get current location"
+                _uiState.value = ScreenState.Error("Unable to get current location")
             }
         }
     }
-    
-    fun getWeatherForLocation(location: Location) {
-        isLoading.value = true
-        error.value = null
-        
-        weatherRepository.getWeatherData(location) { data, exception ->
-            
-            Handler(Looper.getMainLooper()).post {
-                isLoading.value = false
-                
-                if (data != null) {
-                    weatherData.value = data
-                } else {
-                    error.value = exception?.message ?: "Unknown error"
+
+    private fun getWeatherForLocation(location: Location) {
+        val state = _uiState.value
+        viewModelScope.launch {
+            val data = weatherRepository.getWeatherData(location)
+
+            if (data.isSuccess) {
+                val weatherData = data.getOrThrow()
+                if(state is ScreenState.Success){
+                    weatherData.isFavorite= state.weatherData.isFavorite
                 }
+                _uiState.value = ScreenState.Success(weatherData)
+            } else {
+                _uiState.value = ScreenState.Error(data.exceptionOrNull()?.message ?: "Unknown error")
             }
         }
     }
-    
+
     fun searchWeatherByCity(city: String) {
         if (city.isBlank()) {
-            error.value = "City name cannot be empty"
+            _uiState.value = ScreenState.Error("City name cannot be empty")
             return
         }
-        
-        isLoading.value = true
-        error.value = null
-        
-        
-        weatherRepository.getWeatherByCity(city) { data, exception ->
-            
-            isLoading.value = false
-            
-            if (data != null) {
-                weatherData.value = data
-                cityName.value = data.cityName
-                currentLocation.value = Location(0.0, 0.0, data.cityName)
+        _uiState.value = ScreenState.Loading
+
+        viewModelScope.launch {
+
+            val data = weatherRepository.getWeatherByCity(city)
+
+            if (data.isSuccess) {
+                _uiState.value = ScreenState.Success(data.getOrThrow())
             } else {
-                error.value = exception?.message ?: "Unknown error"
+                _uiState.value = ScreenState.Error(data.exceptionOrNull()?.message ?: "Unknown error")
             }
         }
     }
-    
-    
-    fun formatTemperature(temp: Double): String {
-        return "${temp.toInt()}°C"
-    }
-    
-    
-    fun loadWeatherIcon(iconCode: String) {
-        coroutineScope.launch {
-            val iconUrl = "https://openweathermap.org/img/wn/$iconCode@2x.png"
-            ImageLoader.loadImage(iconUrl)
-        }
-    }
-    
-    
+
     private fun startAutoRefresh() {
-        refreshTimer = Timer()
-        refreshTimer?.scheduleAtFixedRate(object : TimerTask() {
-            override fun run() {
+        refreshJob?.cancel()
+
+        refreshJob = viewModelScope.launch {
+            while (isActive) {
+                delay(AUTO_REFRESH_DELAY)
+
                 currentLocation.value?.let { location ->
                     getWeatherForLocation(location)
                 }
             }
-        }, 60000, 60000)
-    }
-    
-    
-    fun toggleFavorite() {
-        weatherData.value?.let {
-            it.isFavorite = !it.isFavorite
-            
-            weatherData.value = it
         }
     }
-    
-    
+
+    fun toggleFavorite() {
+        val currentState = _uiState.value
+        if (currentState is ScreenState.Success) {
+            val updatedWeather = currentState.weatherData.copy(
+                isFavorite = !currentState.weatherData.isFavorite
+            )
+            _uiState.value = ScreenState.Success(updatedWeather)
+        }
+    }
+
+    private fun stopAutoRefresh() {
+        refreshJob?.cancel()
+        refreshJob = null
+    }
+
     override fun onCleared() {
         super.onCleared()
-        
+        stopAutoRefresh()
     }
 }

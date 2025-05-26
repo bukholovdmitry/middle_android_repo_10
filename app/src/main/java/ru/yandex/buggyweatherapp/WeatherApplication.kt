@@ -4,7 +4,9 @@ import android.app.Application
 import android.content.Context
 import ru.yandex.buggyweatherapp.utils.ImageLoader
 import ru.yandex.buggyweatherapp.utils.LocationTracker
+import dagger.hilt.android.HiltAndroidApp
 
+@HiltAndroidApp
 class WeatherApplication : Application() {
     
     
