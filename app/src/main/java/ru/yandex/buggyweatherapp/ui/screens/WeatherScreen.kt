@@ -40,8 +40,10 @@ fun WeatherScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        LocationSearch(onCitySearch = { searchText -> viewModel.searchWeatherByCity(searchText) },
-            onLocationRequest = { })
+        LocationSearch(
+            onCitySearch = { searchText -> viewModel.searchWeatherByCity(searchText) },
+            onLocationRequest = { viewModel.requestLocation() }
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 

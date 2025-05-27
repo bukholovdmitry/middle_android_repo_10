@@ -1,5 +1,6 @@
 package ru.yandex.buggyweatherapp.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,12 +10,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import ru.yandex.buggyweatherapp.model.Location
-import ru.yandex.buggyweatherapp.model.ScreenState
 import ru.yandex.buggyweatherapp.data.repository.LocationRepository
 import ru.yandex.buggyweatherapp.data.repository.WeatherRepository
+import ru.yandex.buggyweatherapp.model.Location
+import ru.yandex.buggyweatherapp.model.ScreenState
 import javax.inject.Inject
 
 @HiltViewModel
@@ -25,7 +27,8 @@ class WeatherViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<ScreenState>(ScreenState.Default)
     val uiState: StateFlow<ScreenState> = _uiState.asStateFlow()
 
-    private val currentLocation = MutableLiveData<Location>()
+    private val _currentLocation = MutableLiveData<Location>()
+    private var locationUpdatesJob: Job? = null
 
     private var refreshJob: Job? = null
 
@@ -43,7 +46,7 @@ class WeatherViewModel @Inject constructor(
             val location = locationRepository.getCurrentLocation()
 
             if (location != null) {
-                currentLocation.value = location
+                _currentLocation.value = location
                 getWeatherForLocation(location)
             } else {
                 _uiState.value = ScreenState.Error("Unable to get current location")
@@ -58,12 +61,13 @@ class WeatherViewModel @Inject constructor(
 
             if (data.isSuccess) {
                 val weatherData = data.getOrThrow()
-                if(state is ScreenState.Success){
-                    weatherData.isFavorite= state.weatherData.isFavorite
+                if (state is ScreenState.Success) {
+                    weatherData.isFavorite = state.weatherData.isFavorite
                 }
                 _uiState.value = ScreenState.Success(weatherData)
             } else {
-                _uiState.value = ScreenState.Error(data.exceptionOrNull()?.message ?: "Unknown error")
+                _uiState.value =
+                    ScreenState.Error(data.exceptionOrNull()?.message ?: "Unknown error")
             }
         }
     }
@@ -82,7 +86,8 @@ class WeatherViewModel @Inject constructor(
             if (data.isSuccess) {
                 _uiState.value = ScreenState.Success(data.getOrThrow())
             } else {
-                _uiState.value = ScreenState.Error(data.exceptionOrNull()?.message ?: "Unknown error")
+                _uiState.value =
+                    ScreenState.Error(data.exceptionOrNull()?.message ?: "Unknown error")
             }
         }
     }
@@ -94,7 +99,7 @@ class WeatherViewModel @Inject constructor(
             while (isActive) {
                 delay(AUTO_REFRESH_DELAY)
 
-                currentLocation.value?.let { location ->
+                _currentLocation.value?.let { location ->
                     getWeatherForLocation(location)
                 }
             }
@@ -109,6 +114,22 @@ class WeatherViewModel @Inject constructor(
             )
             _uiState.value = ScreenState.Success(updatedWeather)
         }
+    }
+
+    fun requestLocation() {
+        locationUpdatesJob?.cancel()
+        locationUpdatesJob = viewModelScope.launch {
+            locationRepository.getLocationUpdates()
+                .catch { e ->
+                    Log.e("WeatherViewModel", "Location updates error", e)
+                    _uiState.value = ScreenState.Error("Location tracking failed")
+                }
+                .collect { location ->
+                    _currentLocation.value = location
+                    getWeatherForLocation(location)
+                }
+        }
+
     }
 
     private fun stopAutoRefresh() {

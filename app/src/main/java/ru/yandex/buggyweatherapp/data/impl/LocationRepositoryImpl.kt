@@ -11,34 +11,46 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import ru.yandex.buggyweatherapp.model.Location
 import ru.yandex.buggyweatherapp.data.repository.LocationRepository
+import ru.yandex.buggyweatherapp.model.Location
 import ru.yandex.buggyweatherapp.utils.LocationTracker
 import java.util.Locale
 import javax.inject.Inject
 
-class LocationRepositoryImpl @Inject constructor(private val context: Context): LocationRepository {
-    
-    private val fusedLocationClient: FusedLocationProviderClient = 
+class LocationRepositoryImpl @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val locationTracker: LocationTracker
+) : LocationRepository {
+    companion object {
+        private const val UPDATE_INTERVAL_MS = 10000L
+        private const val MIN_UPDATE_INTERVAL_MS = 5000L
+    }
+
+
+    private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
-    
+
     private var currentLocation: Location? = null
 
     override suspend fun getCurrentLocation(): Location? = withContext(Dispatchers.IO) {
         try {
-            val lastLocation = suspendCancellableCoroutine<android.location.Location?> { continuation ->
-                fusedLocationClient.lastLocation
-                    .addOnSuccessListener { location ->
-                        continuation.resume(location, null)
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("LocationRepository", "Error getting last location", e)
-                        continuation.resume(null, null)
-                    }
-            }
+            val lastLocation =
+                suspendCancellableCoroutine<android.location.Location?> { continuation ->
+                    fusedLocationClient.lastLocation
+                        .addOnSuccessListener { location ->
+                            continuation.resume(location, null)
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e("LocationRepository", "Error getting last location", e)
+                            continuation.resume(null, null)
+                        }
+                }
 
             lastLocation?.let {
                 val userLocation = Location(latitude = it.latitude, longitude = it.longitude)
@@ -56,52 +68,53 @@ class LocationRepositoryImpl @Inject constructor(private val context: Context): 
         }
     }
 
-    private suspend fun requestLocationUpdates(): Location? = suspendCancellableCoroutine { continuation ->
-        try {
-            val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
-                .setWaitForAccurateLocation(false)
-                .setMinUpdateIntervalMillis(5000)
-                .build()
+    private suspend fun requestLocationUpdates(): Location? =
+        suspendCancellableCoroutine { continuation ->
+            try {
+                val locationRequest =
+                    LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, UPDATE_INTERVAL_MS)
+                        .setWaitForAccurateLocation(false)
+                        .setMinUpdateIntervalMillis(MIN_UPDATE_INTERVAL_MS)
+                        .build()
 
-            val locationCallback = object : LocationCallback() {
-                override fun onLocationResult(locationResult: LocationResult) {
-                    super.onLocationResult(locationResult)
-                    locationResult.lastLocation?.let { androidLocation ->
-                        val userLocation = Location(
-                            latitude = androidLocation.latitude,
-                            longitude = androidLocation.longitude
-                        )
-                        currentLocation = userLocation
-                        continuation.resume(userLocation, null)
-                        fusedLocationClient.removeLocationUpdates(this)
+                val locationCallback = object : LocationCallback() {
+                    override fun onLocationResult(locationResult: LocationResult) {
+                        super.onLocationResult(locationResult)
+                        locationResult.lastLocation?.let { androidLocation ->
+                            val userLocation = Location(
+                                latitude = androidLocation.latitude,
+                                longitude = androidLocation.longitude
+                            )
+                            currentLocation = userLocation
+                            continuation.resume(userLocation, null)
+                            fusedLocationClient.removeLocationUpdates(this)
+                        }
+                    }
+
+                    override fun onLocationAvailability(availability: LocationAvailability) {
+                        super.onLocationAvailability(availability)
+                        if (!availability.isLocationAvailable) {
+                            continuation.resume(null, null)
+                            fusedLocationClient.removeLocationUpdates(this)
+                        }
                     }
                 }
 
-                override fun onLocationAvailability(availability: LocationAvailability) {
-                    super.onLocationAvailability(availability)
-                    if (!availability.isLocationAvailable) {
-                        continuation.resume(null, null)
-                        fusedLocationClient.removeLocationUpdates(this)
-                    }
+                continuation.invokeOnCancellation {
+                    fusedLocationClient.removeLocationUpdates(locationCallback)
                 }
-            }
 
-            continuation.invokeOnCancellation {
-                fusedLocationClient.removeLocationUpdates(locationCallback)
+                fusedLocationClient.requestLocationUpdates(
+                    locationRequest,
+                    locationCallback,
+                    Looper.getMainLooper()
+                )
+            } catch (e: SecurityException) {
+                Log.e("LocationRepository", "Location permission not granted", e)
+                continuation.resume(null, null)
             }
-
-            fusedLocationClient.requestLocationUpdates(
-                locationRequest,
-                locationCallback,
-                Looper.getMainLooper()
-            )
-        } catch (e: SecurityException) {
-            Log.e("LocationRepository", "Location permission not granted", e)
-            continuation.resume(null, null)
         }
-    }
-    
-    
+
     override suspend fun getCityNameFromLocation(location: Location): String? {
         try {
             
@@ -127,9 +140,8 @@ class LocationRepositoryImpl @Inject constructor(private val context: Context): 
             return null
         }
     }
-    
-    
-    override suspend fun startLocationTracking() {
-        LocationTracker.getInstance(context).startTracking()
-    }
+
+    override suspend fun getLocationUpdates(): Flow<Location> =
+        locationTracker.locationFlow()
+            .flowOn(Dispatchers.IO)
 }
