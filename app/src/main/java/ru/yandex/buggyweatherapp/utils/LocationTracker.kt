@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
+import ru.yandex.buggyweatherapp.model.Location as YandexLocation
 
 @Singleton
 class LocationTracker @Inject constructor(
@@ -29,7 +30,7 @@ class LocationTracker @Inject constructor(
         private const val MIN_UPDATE_INTERVAL_MS = 5000L
         private const val MIN_UPDATE_DISTANCE_METERS = 10f
 
-        private fun Location.toDomainLocation() = ru.yandex.buggyweatherapp.model.Location(
+        private fun Location.toDomainLocation() = YandexLocation(
             latitude = latitude,
             longitude = longitude
         )

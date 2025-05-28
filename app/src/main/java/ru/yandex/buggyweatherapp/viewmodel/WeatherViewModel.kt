@@ -131,14 +131,4 @@ class WeatherViewModel @Inject constructor(
         }
 
     }
-
-    private fun stopAutoRefresh() {
-        refreshJob?.cancel()
-        refreshJob = null
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        stopAutoRefresh()
-    }
 }

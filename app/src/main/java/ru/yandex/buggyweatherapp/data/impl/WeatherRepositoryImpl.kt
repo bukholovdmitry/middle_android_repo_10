@@ -11,7 +11,7 @@ import ru.yandex.buggyweatherapp.model.Location
 import ru.yandex.buggyweatherapp.model.WeatherData
 import java.io.IOException
 
-class WeatherRepositoryImpl: WeatherRepository {
+internal class WeatherRepositoryImpl : WeatherRepository {
     private val weatherApi = RetrofitInstance.weatherApi
 
     private var cachedWeatherData: WeatherData? = null

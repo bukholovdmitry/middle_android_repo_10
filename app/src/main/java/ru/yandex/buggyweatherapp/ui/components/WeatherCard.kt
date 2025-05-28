@@ -68,13 +68,14 @@ private fun HeaderSection(
             IconButton(onClick = onFavoriteClick) {
                 Icon(
                     imageVector = if (weather.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Favorite"
+                    contentDescription = stringResource(R.string.favorite),
                 )
             }
 
             IconButton(onClick = onRefreshClick) {
                 Icon(
-                    imageVector = Icons.Default.Refresh, contentDescription = "Refresh"
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = stringResource(R.string.refresh)
                 )
             }
         }

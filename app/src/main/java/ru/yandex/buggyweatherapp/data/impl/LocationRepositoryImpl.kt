@@ -23,7 +23,7 @@ import ru.yandex.buggyweatherapp.utils.LocationTracker
 import java.util.Locale
 import javax.inject.Inject
 
-class LocationRepositoryImpl @Inject constructor(
+internal class LocationRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val locationTracker: LocationTracker
 ) : LocationRepository {
@@ -117,12 +117,12 @@ class LocationRepositoryImpl @Inject constructor(
 
     override suspend fun getCityNameFromLocation(location: Location): String? {
         try {
-            
+
             val geocoder = Geocoder(context, Locale.getDefault())
-            
+
             @Suppress("DEPRECATION")
             val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-            
+
             return if (!addresses.isNullOrEmpty()) {
                 val address = addresses[0]
                 if (address.locality != null) {

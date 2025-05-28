@@ -27,4 +27,5 @@
     <string name="wind_format">%.1f m/s</string>
     <string name="location_permission_title">Location access needed</string>
     <string name="location_permission_message">We need location access to show weather for your area</string>
+    <string name="favorite">Favorite</string>
 </resources>
