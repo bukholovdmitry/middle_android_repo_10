@@ -1,90 +1,83 @@
 package ru.yandex.buggyweatherapp.utils
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
-import android.os.Handler
 import android.os.Looper
-import android.util.Log
-import java.util.concurrent.CopyOnWriteArrayList
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import java.util.concurrent.atomic.AtomicBoolean
+import javax.inject.Inject
+import javax.inject.Singleton
+import ru.yandex.buggyweatherapp.model.Location as YandexLocation
 
-class LocationTracker private constructor(
-    
-    private val context: Context
+@Singleton
+class LocationTracker @Inject constructor(
+    @ApplicationContext private val context: Context
 ) {
-    
+    private val locationManager =
+        context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+    private val isTracking = AtomicBoolean(false)
+
     companion object {
-        @Volatile
-        private var instance: LocationTracker? = null
-        
-        fun getInstance(context: Context): LocationTracker {
-            return instance ?: synchronized(this) {
-                instance ?: LocationTracker(context).also { instance = it }
+        private const val MIN_UPDATE_INTERVAL_MS = 5000L
+        private const val MIN_UPDATE_DISTANCE_METERS = 10f
+
+        private fun Location.toDomainLocation() = YandexLocation(
+            latitude = latitude,
+            longitude = longitude
+        )
+    }
+
+
+    @SuppressLint("MissingPermission")
+    fun locationFlow(): Flow<ru.yandex.buggyweatherapp.model.Location> = callbackFlow {
+        if (!isTracking.compareAndSet(false, true)) {
+            close(IllegalStateException("Tracking already started"))
+            return@callbackFlow
+        }
+
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                trySend(location.toDomainLocation())
             }
+
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+            override fun onProviderEnabled(provider: String) = Unit
+            override fun onProviderDisabled(provider: String) = Unit
         }
-    }
-    
-    
-    private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    
-    
-    private val listeners = CopyOnWriteArrayList<(ru.yandex.buggyweatherapp.model.Location) -> Unit>()
-    
-    
-    private val locationListener = object : LocationListener {
-        override fun onLocationChanged(location: Location) {
-            
-            val newLocation = ru.yandex.buggyweatherapp.model.Location(
-                latitude = location.latitude,
-                longitude = location.longitude
-            )
-            
-            
-            notifyListeners(newLocation)
-        }
-        
-        @Deprecated("Deprecated in Java")
-        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-        
-        override fun onProviderEnabled(provider: String) {}
-        
-        override fun onProviderDisabled(provider: String) {}
-    }
-    
-    
-    fun startTracking() {
+
         try {
-            
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
-                5000, // 5 секунд
-                10f, // 10 метров
-                locationListener
+                MIN_UPDATE_INTERVAL_MS,
+                MIN_UPDATE_DISTANCE_METERS,
+                listener,
+                Looper.getMainLooper()
             )
-            
-            
-        } catch (e: SecurityException) {
-            Log.e("LocationTracker", "Permission denied", e)
-        } catch (e: Exception) {
-            Log.e("LocationTracker", "Error starting location tracking", e)
-        }
-    }
-    
-    
-    fun addListener(listener: (ru.yandex.buggyweatherapp.model.Location) -> Unit) {
-        listeners.add(listener)
-    }
-    
-    private fun notifyListeners(location: ru.yandex.buggyweatherapp.model.Location) {
-        
-        Handler(Looper.getMainLooper()).post {
-            for (listener in listeners) {
-                listener(location)
+
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let {
+                trySend(it.toDomainLocation())
             }
+        } catch (e: Exception) {
+            close(e)
+            isTracking.set(false)
+            return@callbackFlow
         }
+
+        awaitClose {
+            locationManager.removeUpdates(listener)
+            isTracking.set(false)
+        }
+    }.distinctUntilChanged { old, new ->
+        old.latitude == new.latitude && old.longitude == new.longitude
     }
-    
-    
+
 }

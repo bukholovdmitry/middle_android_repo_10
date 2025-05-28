@@ -5,11 +5,27 @@
     <string name="loading">Loading weather data…</string>
     <string name="refresh">Refresh</string>
     <string name="temperature">Temperature: %1$s°C</string>
-    <string name="feels_like">Feels like: %1$s°C</string>
-    <string name="humidity">Humidity: %1$s%%</string>
-    <string name="wind">Wind: %1$s m/s</string>
+    <string name="feels_like">Feels like</string>
+    <string name="humidity">Humidity</string>
+    <string name="wind">Wind</string>
     <string name="description">Description: %1$s</string>
     <string name="no_location_permission">Location permission is required to get current weather</string>
     <string name="location_error">Unable to get current location</string>
     <string name="network_error">Network error. Please check your connection</string>
+    <string name="favorite_icon_desc">Add to favorites</string>
+    <string name="refresh_icon_desc">Refresh weather</string>
+    <string name="weather_icon_desc">Weather condition icon</string>
+    <string name="min_max">Min/Max</string>
+    <string name="pressure">Pressure</string>
+    <string name="sunrise">Sunrise</string>
+    <string name="sunset">Sunset</string>
+
+    <string name="temperature_format">%1$.1f°C</string>
+    <string name="min_max_format">%1$.1f°C / %2$.1f°C</string>
+    <string name="percent_format">%d%%</string>
+    <string name="pressure_format">%d hPa</string>
+    <string name="wind_format">%.1f m/s</string>
+    <string name="location_permission_title">Location access needed</string>
+    <string name="location_permission_message">We need location access to show weather for your area</string>
+    <string name="favorite">Favorite</string>
 </resources>
